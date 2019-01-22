@@ -6,6 +6,37 @@ https://github.com/denoland/deno/releases
 We also have a one-line install commands at
 https://github.com/denoland/deno_install
 
+### v0.2.8 / 2019.01.19
+
+- Add --prefetch flag for deps prefetch without running (#1475)
+- Kill all pending accepts when TCP listener is closed (#1517)
+- Add globalThis definition to runtime (#1534)
+- mkdir should not be recursive by default (#1530)
+- Avoid crashes on ES module resolution when module not found (#1546)
+
+### v0.2.7 / 2019.01.14
+
+- Use rust 2018 edition
+- Native ES modules (#1460 #1492 #1512 #1514)
+- Properly parse network addresses (#1515)
+- Added rid to Conn interface (#1513)
+- Prevent segfault when eval throws an error (#1411)
+- Add --allow-all flag (#1482)
+
+### v0.2.6 / 2019.01.06
+
+- Implement console.groupCollapsed (#1452)
+- Add deno.pid (#1464)
+- Add Event web API (#1059)
+- Support more fetch init body types (#1449)
+
+### v0.2.5 / 2018.12.31
+
+- Runtime argument checks (#1427 #1415)
+- Lazily create .mime files only with mismatch/no extension (#1417)
+- Fix FormData.name (#1412)
+- Print string with NULL '\0' (#1428)
+
 ### v0.2.4 / 2018.12.23
 
 - "cargo build" support (#1369 #1296 #1377 #1379)
@@ -249,7 +280,7 @@ This is already working.
 When the rewrite is at feature parity with the Go prototype, we will release
 binaries for people to try.
 
-### v0.0.0 / 2018.09.32 / Golang Prototype
+### v0.0.0 / 2018.05.14 - 2018.06.22 / Golang Prototype
 
 https://github.com/denoland/deno/tree/golang
 

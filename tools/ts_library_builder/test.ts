@@ -1,9 +1,14 @@
+// Copyright 2018-2019 the Deno authors. All rights reserved. MIT license.
 // Run this manually with:
 //
 //  ./node_modules/.bin/ts-node --project tools/ts_library_builder/tsconfig.json tools/ts_library_builder/test.ts
 
 import { Project, ts } from "ts-simple-ast";
-import { assert, assertEqual, test } from "../../js/testing/testing";
+import {
+  assert,
+  assertEqual,
+  test
+} from "../../js/deps/https/deno.land/x/std/testing/mod";
 import { flatten, mergeGlobal } from "./build_library";
 import { loadDtsFiles } from "./ast_util";
 
@@ -136,24 +141,25 @@ test(function buildLibraryMerge() {
   assertEqual(targetSourceFile.getInterfaces().length, 1);
   const variableDeclarations = targetSourceFile.getVariableDeclarations();
   assertEqual(variableDeclarations[0].getType().getText(), `FooBar`);
-  assertEqual(variableDeclarations[1].getType().getText(), `moduleC.Bar`);
+  assertEqual(variableDeclarations[1].getType().getText(), `FooBar`);
+  assertEqual(variableDeclarations[2].getType().getText(), `moduleC.Bar`);
   assertEqual(
-    variableDeclarations[2].getType().getText(),
+    variableDeclarations[3].getType().getText(),
     `typeof moduleC.qat`
   );
   assertEqual(
-    variableDeclarations[3].getType().getText(),
+    variableDeclarations[4].getType().getText(),
     `typeof moduleE.process`
   );
   assertEqual(
-    variableDeclarations[4].getType().getText(),
+    variableDeclarations[5].getType().getText(),
     `typeof moduleD.reprocess`
   );
   assertEqual(
-    variableDeclarations[5].getType().getText(),
+    variableDeclarations[6].getType().getText(),
     `typeof moduleC.Bar`
   );
-  assertEqual(variableDeclarations.length, 6);
+  assertEqual(variableDeclarations.length, 7);
   const typeAliases = targetSourceFile.getTypeAliases();
   assertEqual(typeAliases[0].getName(), "Bar");
   assertEqual(typeAliases[0].getType().getText(), "moduleC.Bar");

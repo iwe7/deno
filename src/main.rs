@@ -1,33 +1,14 @@
-// Copyright 2018 the Deno authors. All rights reserved. MIT license.
-extern crate dirs;
-extern crate flatbuffers;
-extern crate getopts;
-extern crate http;
-extern crate hyper;
-extern crate hyper_rustls;
-extern crate libc;
-extern crate rand;
-extern crate remove_dir_all;
-extern crate ring;
-extern crate rustyline;
-extern crate serde_json;
-extern crate source_map_mappings;
-extern crate tempfile;
-extern crate tokio;
-extern crate tokio_executor;
-extern crate tokio_fs;
-extern crate tokio_io;
-extern crate tokio_process;
-extern crate tokio_threadpool;
-extern crate url;
-
+// Copyright 2018-2019 the Deno authors. All rights reserved. MIT license.
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate log;
 #[macro_use]
 extern crate futures;
+#[macro_use]
+extern crate serde_json;
 
+pub mod compiler;
 pub mod deno_dir;
 pub mod errors;
 pub mod flags;
@@ -42,11 +23,13 @@ pub mod msg_util;
 pub mod ops;
 pub mod permissions;
 mod repl;
+pub mod resolve_addr;
 pub mod resources;
 pub mod snapshot;
 mod tokio_util;
 mod tokio_write;
 pub mod version;
+pub mod workers;
 
 #[cfg(unix)]
 mod eager_unix;
@@ -59,11 +42,11 @@ static LOGGER: Logger = Logger;
 struct Logger;
 
 impl log::Log for Logger {
-  fn enabled(&self, metadata: &log::Metadata) -> bool {
+  fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
     metadata.level() <= log::max_level()
   }
 
-  fn log(&self, record: &log::Record) {
+  fn log(&self, record: &log::Record<'_>) {
     if self.enabled(record.metadata()) {
       println!("{} RS - {}", record.level(), record.args());
     }
@@ -96,13 +79,26 @@ fn main() {
     log::LevelFilter::Warn
   });
 
-  let state = Arc::new(isolate::IsolateState::new(flags, rest_argv));
+  let should_prefetch = flags.prefetch;
+
+  let state = Arc::new(isolate::IsolateState::new(flags, rest_argv, None));
   let snapshot = snapshot::deno_snapshot();
   let isolate = isolate::Isolate::new(snapshot, state, ops::dispatch);
+
   tokio_util::init(|| {
+    // Setup runtime.
     isolate
       .execute("denoMain();")
       .unwrap_or_else(print_err_and_exit);
+
+    // Execute input file.
+    if isolate.state.argv.len() > 1 {
+      let input_filename = &isolate.state.argv[1];
+      isolate
+        .execute_mod(input_filename, should_prefetch)
+        .unwrap_or_else(print_err_and_exit);
+    }
+
     isolate.event_loop().unwrap_or_else(print_err_and_exit);
   });
 }

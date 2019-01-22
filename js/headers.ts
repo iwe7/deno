@@ -1,6 +1,7 @@
-// Copyright 2018 the Deno authors. All rights reserved. MIT license.
+// Copyright 2018-2019 the Deno authors. All rights reserved. MIT license.
 import * as domTypes from "./dom_types";
 import { DomIterableMixin } from "./mixins/dom_iterable";
+import { requiredArguments } from "./util";
 
 // From node-fetch
 // Copyright (c) 2016 David Frank. MIT License.
@@ -30,10 +31,11 @@ class HeadersBase {
   // https://github.com/bitinn/node-fetch/blob/master/src/headers.js
   // Copyright (c) 2016 David Frank. MIT License.
   private _validateName(name: string) {
-    if (invalidTokenRegex.test(name)) {
+    if (invalidTokenRegex.test(name) || name === "") {
       throw new TypeError(`${name} is not a legal HTTP header name`);
     }
   }
+
   private _validateValue(value: string) {
     if (invalidHeaderCharRegex.test(value)) {
       throw new TypeError(`${value} is not a legal HTTP header value`);
@@ -50,8 +52,17 @@ class HeadersBase {
     } else {
       this[headerMap] = new Map();
       if (Array.isArray(init)) {
-        for (const [rawName, rawValue] of init) {
-          const [name, value] = this._normalizeParams(rawName, rawValue);
+        for (const tuple of init) {
+          // If header does not contain exactly two items,
+          // then throw a TypeError.
+          // ref: https://fetch.spec.whatwg.org/#concept-headers-fill
+          if (tuple.length !== 2) {
+            // tslint:disable:max-line-length
+            // prettier-ignore
+            throw new TypeError("Failed to construct 'Headers'; Each header pair must be an iterable [name, value] tuple");
+          }
+
+          const [name, value] = this._normalizeParams(tuple[0], tuple[1]);
           this._validateName(name);
           this._validateValue(value);
           const existingValue = this[headerMap].get(name);
@@ -75,6 +86,7 @@ class HeadersBase {
 
   // ref: https://fetch.spec.whatwg.org/#concept-headers-append
   append(name: string, value: string): void {
+    requiredArguments("Headers.append", arguments.length, 2);
     const [newname, newvalue] = this._normalizeParams(name, value);
     this._validateName(newname);
     this._validateValue(newvalue);
@@ -84,12 +96,14 @@ class HeadersBase {
   }
 
   delete(name: string): void {
+    requiredArguments("Headers.delete", arguments.length, 1);
     const [newname] = this._normalizeParams(name);
     this._validateName(newname);
     this[headerMap].delete(newname);
   }
 
   get(name: string): string | null {
+    requiredArguments("Headers.get", arguments.length, 1);
     const [newname] = this._normalizeParams(name);
     this._validateName(newname);
     const value = this[headerMap].get(newname);
@@ -97,12 +111,14 @@ class HeadersBase {
   }
 
   has(name: string): boolean {
+    requiredArguments("Headers.has", arguments.length, 1);
     const [newname] = this._normalizeParams(name);
     this._validateName(newname);
     return this[headerMap].has(newname);
   }
 
   set(name: string, value: string): void {
+    requiredArguments("Headers.set", arguments.length, 2);
     const [newname, newvalue] = this._normalizeParams(name, value);
     this._validateName(newname);
     this._validateValue(newvalue);

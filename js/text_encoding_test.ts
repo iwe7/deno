@@ -1,4 +1,4 @@
-// Copyright 2018 the Deno authors. All rights reserved. MIT license.
+// Copyright 2018-2019 the Deno authors. All rights reserved. MIT license.
 import { test, assert, assertEqual } from "./test_util.ts";
 
 test(function atobSuccess() {
@@ -23,17 +23,6 @@ test(function btoaFailed() {
   }
   assert(!!err);
   assertEqual(err.name, "InvalidInput");
-});
-
-test(function textDecoder() {
-  // prettier-ignore
-  const fixture = new Uint8Array([
-    0xef, 0xbf, 0xbd, 0xef, 0xbf, 0xbd,
-    0xef, 0xbf, 0xbd, 0xef, 0xbf, 0xbd,
-    0xef, 0xbf, 0xbd, 0xef, 0xbf, 0xbd
-  ]);
-  const decoder = new TextDecoder();
-  assertEqual(decoder.decode(fixture), "������");
 });
 
 test(function textDecoder2() {
@@ -63,17 +52,6 @@ test(function textDecoderErrorEncoding() {
     assertEqual(e.message, "The encoding label provided ('foo') is invalid.");
   }
   assert(didThrow);
-});
-
-test(function textEncoder() {
-  const fixture = "������";
-  const encoder = new TextEncoder();
-  // prettier-ignore
-  assertEqual(Array.from(encoder.encode(fixture)), [
-    0xef, 0xbf, 0xbd, 0xef, 0xbf, 0xbd,
-    0xef, 0xbf, 0xbd, 0xef, 0xbf, 0xbd,
-    0xef, 0xbf, 0xbd, 0xef, 0xbf, 0xbd
-  ]);
 });
 
 test(function textEncoder2() {

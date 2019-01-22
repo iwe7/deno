@@ -1,4 +1,4 @@
-// Copyright 2018 the Deno authors. All rights reserved. MIT license.
+// Copyright 2018-2019 the Deno authors. All rights reserved. MIT license.
 use libc::c_char;
 use libc::c_int;
 use libc::c_void;
@@ -13,7 +13,7 @@ pub struct isolate {
 }
 
 /// If "alloc_ptr" is not null, this type represents a buffer which is created
-/// in C side, and then passed to Rust side by `DenoRecvCb`. Finally it should
+/// in C side, and then passed to Rust side by `deno_recv_cb`. Finally it should
 /// be moved back to C side by `deno_respond`. If it is not passed to
 /// `deno_respond` in the end, it will be leaked.
 ///
@@ -102,11 +102,19 @@ impl AsMut<[u8]> for deno_buf {
   }
 }
 
-type DenoRecvCb = unsafe extern "C" fn(
+#[allow(non_camel_case_types)]
+type deno_recv_cb = unsafe extern "C" fn(
   user_data: *mut c_void,
   req_id: i32,
   buf: deno_buf,
   data_buf: deno_buf,
+);
+
+#[allow(non_camel_case_types)]
+type deno_resolve_cb = unsafe extern "C" fn(
+  user_data: *mut c_void,
+  specifier: *const c_char,
+  referrer: *const c_char,
 );
 
 #[repr(C)]
@@ -114,7 +122,8 @@ pub struct deno_config {
   pub will_snapshot: c_int,
   pub load_snapshot: deno_buf,
   pub shared: deno_buf,
-  pub recv_cb: DenoRecvCb,
+  pub recv_cb: deno_recv_cb,
+  pub resolve_cb: deno_resolve_cb,
 }
 
 extern "C" {
@@ -137,4 +146,16 @@ extern "C" {
     js_filename: *const c_char,
     js_source: *const c_char,
   ) -> c_int;
+  pub fn deno_execute_mod(
+    i: *const isolate,
+    user_data: *const c_void,
+    js_filename: *const c_char,
+    js_source: *const c_char,
+    resolve_only: i32,
+  ) -> c_int;
+  pub fn deno_resolve_ok(
+    i: *const isolate,
+    js_filename: *const c_char,
+    js_source: *const c_char,
+  );
 }

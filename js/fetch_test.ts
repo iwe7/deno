@@ -1,4 +1,4 @@
-// Copyright 2018 the Deno authors. All rights reserved. MIT license.
+// Copyright 2018-2019 the Deno authors. All rights reserved. MIT license.
 import { test, testPerm, assert, assertEqual } from "./test_util.ts";
 import * as deno from "deno";
 
@@ -82,6 +82,57 @@ testPerm({ net: true }, async function fetchURLEncodedFormDataSuccess() {
   assertEqual(formData.get("field_1").toString(), "Hi");
   assert(formData.has("field_2"));
   assertEqual(formData.get("field_2").toString(), "<Deno>");
+});
+
+testPerm({ net: true }, async function fetchInitStringBody() {
+  const data = "Hello World";
+  const response = await fetch("http://localhost:4545/echo_server", {
+    method: "POST",
+    body: data
+  });
+  const text = await response.text();
+  assertEqual(text, data);
+  assert(response.headers.get("content-type").startsWith("text/plain"));
+});
+
+testPerm({ net: true }, async function fetchInitTypedArrayBody() {
+  const data = "Hello World";
+  const response = await fetch("http://localhost:4545/echo_server", {
+    method: "POST",
+    body: new TextEncoder().encode(data)
+  });
+  const text = await response.text();
+  assertEqual(text, data);
+});
+
+testPerm({ net: true }, async function fetchInitURLSearchParamsBody() {
+  const data = "param1=value1&param2=value2";
+  const params = new URLSearchParams(data);
+  const response = await fetch("http://localhost:4545/echo_server", {
+    method: "POST",
+    body: params
+  });
+  const text = await response.text();
+  assertEqual(text, data);
+  assert(
+    response.headers
+      .get("content-type")
+      .startsWith("application/x-www-form-urlencoded")
+  );
+});
+
+testPerm({ net: true }, async function fetchInitBlobBody() {
+  const data = "const a = 1";
+  const blob = new Blob([data], {
+    type: "text/javascript"
+  });
+  const response = await fetch("http://localhost:4545/echo_server", {
+    method: "POST",
+    body: blob
+  });
+  const text = await response.text();
+  assertEqual(text, data);
+  assert(response.headers.get("content-type").startsWith("text/javascript"));
 });
 
 // TODO(ry) The following tests work but are flaky. There's a race condition

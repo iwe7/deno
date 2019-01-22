@@ -1,6 +1,9 @@
 union Any {
   Start,
   StartRes,
+  WorkerGetMessage,
+  WorkerGetMessageRes,
+  WorkerPostMessage,
   CodeFetch,
   CodeFetchRes,
   CodeCache,
@@ -124,6 +127,13 @@ enum MediaType: byte {
   Unknown
 }
 
+table Shared {
+  lock: bool;
+  head: int;
+  tail: int;
+  ring: [Base];
+}
+
 table Base {
   cmd_id: uint32;
   sync: bool = false;
@@ -138,6 +148,7 @@ table Start {
 
 table StartRes {
   cwd: string;
+  pid: uint32;
   argv: [string];
   debug_flag: bool;
   deps_flag: bool;
@@ -146,6 +157,18 @@ table StartRes {
   version_flag: bool;
   deno_version: string;
   v8_version: string;
+}
+
+table WorkerGetMessage {
+  unused: int8;
+}
+
+table WorkerGetMessageRes {
+  data: [ubyte];
+}
+
+table WorkerPostMessage {
+  // data passed thru the zero-copy data parameter.
 }
 
 table CodeFetch {
@@ -160,16 +183,18 @@ table CodeFetchRes {
   module_name: string;
   filename: string;
   media_type: MediaType;
-  source_code: [ubyte];
-  output_code: [ubyte]; // Non-empty only if cached.
-  source_map: [ubyte]; // Non-empty only if cached.
+  // TODO These should be [ubyte].
+  // See: https://github.com/denoland/deno/issues/1113
+  source_code: string;
+  output_code: string; // Non-empty only if cached.
+  source_map: string; // Non-empty only if cached.
 }
 
 table CodeCache {
   filename: string;
-  source_code: [ubyte];
-  output_code: [ubyte];
-  source_map: [ubyte];
+  source_code: string;
+  output_code: string;
+  source_map: string;
 }
 
 table Chdir {
@@ -235,14 +260,13 @@ table MakeTempDirRes {
 
 table Mkdir {
   path: string;
-  mode: uint;
-  // mode specified by https://godoc.org/os#FileMode
+  recursive: bool;
+  mode: uint; // Specified by https://godoc.org/os#FileMode
 }
 
 table Chmod {
   path: string;
-  mode: uint;
-  // mode specified by https://godoc.org/os#FileMode
+  mode: uint; // Specified by https://godoc.org/os#FileMode
 }
 
 table Remove {

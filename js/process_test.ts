@@ -1,9 +1,9 @@
-// Copyright 2018 the Deno authors. All rights reserved. MIT license.
+// Copyright 2018-2019 the Deno authors. All rights reserved. MIT license.
 import { test, testPerm, assert, assertEqual } from "./test_util.ts";
 import { run, DenoError, ErrorKind } from "deno";
 import * as deno from "deno";
 
-test(async function runPermissions() {
+test(function runPermissions() {
   let caughtError = false;
   try {
     deno.run({ args: ["python", "-c", "print('hello world')"] });
@@ -52,7 +52,7 @@ testPerm({ run: true }, async function runCommandFailedWithSignal() {
   p.close();
 });
 
-testPerm({ run: true }, async function runNotFound() {
+testPerm({ run: true }, function runNotFound() {
   let error;
   try {
     run({ args: ["this file hopefully doesn't exist"] });

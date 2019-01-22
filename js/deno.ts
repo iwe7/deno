@@ -1,8 +1,8 @@
-// Copyright 2018 the Deno authors. All rights reserved. MIT license.
+// Copyright 2018-2019 the Deno authors. All rights reserved. MIT license.
 
 // Public deno module.
 /// <amd-module name="deno"/>
-export { env, exit } from "./os";
+export { pid, env, exit } from "./os";
 export { chdir, cwd } from "./dir";
 export {
   File,
@@ -66,6 +66,3 @@ export { deferred } from "./util";
 import * as compiler from "./compiler";
 // @internal
 export const _compiler = compiler;
-import * as runner from "./runner";
-// @internal
-export const _runner = runner;

@@ -7,7 +7,7 @@ env:
   global:
   - CARGO_HOME=$TRAVIS_BUILD_DIR/third_party/rust_crates/
   - RUSTUP_HOME=$HOME/.rustup/
-  - RUST_BACKTRACE=1
+  - RUST_BACKTRACE=full
   - CARGO_TARGET_DIR=$HOME/target
   - PATH=$TRAVIS_BUILD_DIR/third_party/llvm-build/Release+Asserts/bin:$CARGO_HOME/bin:$PATH
   - RUSTC_WRAPPER=sccache
@@ -20,7 +20,8 @@ cache:
   - "$RUSTUP_HOME"
   - $CARGO_HOME/registry/index/
   - $CARGO_HOME/registry/cache/
-  - prebuilt/
+  - prebuilt/mac
+  - prebuilt/linux64
   - third_party/v8/build/linux/debian_sid_amd64-sysroot/
   - third_party/v8/third_party/llvm-build/
 
@@ -32,9 +33,9 @@ install:
   # Install Rust.
   # TODO(ry) Include rustc in third_party.
   # https://github.com/denoland/deno/issues/386
-  if [ ! $(rustc --version | grep 1.30.0) ]; then
-    curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.30.0
-    rustup default 1.30.0
+  if [ ! $(rustc --version | grep 1.31.1) ]; then
+    curl -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.31.1
+    rustup default 1.31.1
   fi
   rustc --version
   cargo --version
@@ -63,8 +64,8 @@ before_script:
 # Default script for release builds.
 script:
 - ./tools/lint.py
+- ./tools/build.py -C target/release
 - ./tools/test_format.py
-- ./tools/build.py -C target/release -j2
 - DENO_BUILD_MODE=release ./tools/test.py
 
 jobs:
@@ -106,7 +107,7 @@ jobs:
     - name: "cargo release linux"
       os: linux
       script:
-      - cargo build -vv --release -j2
+      - cargo build -vv --release --locked
 
     # LSAN: We are in the process of getting a completely clean LSAN build,
     # but it will take some work. So for now we just run a subset of the
@@ -121,6 +122,6 @@ jobs:
       # Call gn gen again to make sure new args are recognized.
       - third_party/depot_tools/gn gen target/debug
       - export ASAN_OPTIONS=detect_leaks=1
-      - ./tools/build.py test_cc -j2
+      - ./tools/build.py test_cc
       - ./target/debug/test_cc
 

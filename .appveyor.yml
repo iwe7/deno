@@ -13,10 +13,11 @@ environment:
   DENO_THIRD_PARTY_PATH: $(APPVEYOR_BUILD_FOLDER)\third_party
   MTIME_CACHE_DB: $(APPVEYOR_BUILD_FOLDER)\mtime_cache.xml
   RELEASE_ARTIFACT: deno_win_x64.zip
-  RUST_DIR: $(USERPROFILE)\rust
+  # Renamed to fix an Appveyor cache bug (restoring old caches).
+  RUST_DIR: $(USERPROFILE)\xrust
   CARGO_HOME: $(RUST_DIR)\cargo
   RUSTUP_HOME: $(RUST_DIR)\rustup
-  RUST_BACKTRACE: 1
+  RUST_BACKTRACE: full
   RUSTC_WRAPPER: sccache
   SCCACHE_BUCKET: deno-sccache
   AWS_ACCESS_KEY_ID: AKIAIVRN52PLDBP55LBQ
@@ -238,8 +239,8 @@ cache:
   - $(APPVEYOR_BUILD_FOLDER)\third_party
   # Cache file mtimes in the main git repo, also to enable incremental builds.
   - $(MTIME_CACHE_DB)
-  # Build incrementally.
-  - $(DENO_BUILD_PATH)
+  # TODO Incremental build disabled because there are some bugs.
+  #- $(DENO_BUILD_PATH)
 
 init:
   # Load utility functions
@@ -303,7 +304,7 @@ install:
         Invoke-WebRequest -Uri "https://win.rustup.rs" `
                           -OutFile "$env:TEMP\rustup-init.exe"
         Exec -NoNewLines {
-          & "$env:TEMP\rustup-init.exe" -y --default-toolchain 1.30.0
+          & "$env:TEMP\rustup-init.exe" -y --default-toolchain 1.31.1
         }
         Delete-Tree @(
           "$env:RUSTUP_HOME\downloads",
@@ -349,7 +350,7 @@ before_build:
 build_script:
   # Build with Cargo first. Both builds produce a deno.exe in the same dir. We
   # want the final one (which gets tested and released) to be built by Ninja.
-  - cargo build -vv --release
+  - cargo build -vv --release --locked
   - ps: Set-FilesNeeded -Auto -Reason "Cargo build finished"
 
   - python tools\build.py

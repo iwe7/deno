@@ -1,4 +1,4 @@
-# Copyright 2018 the Deno authors. All rights reserved. MIT license.
+# Copyright 2018-2019 the Deno authors. All rights reserved. MIT license.
 import("//build/toolchain/cc_wrapper.gni")
 import("//build_extra/flatbuffers/flatbuffer.gni")
 import("//build_extra/flatbuffers/rust/rust_flatbuffer.gni")
@@ -26,7 +26,6 @@ main_extern = [
   "$rust_build:http",
   "$rust_build:hyper",
   "$rust_build:hyper_rustls",
-  "$rust_build:kernel32",
   "$rust_build:lazy_static",
   "$rust_build:libc",
   "$rust_build:log",
@@ -44,8 +43,10 @@ main_extern = [
   "$rust_build:tokio_process",
   "$rust_build:tokio_threadpool",
   "$rust_build:url",
-  "$rust_build:winapi",
 ]
+if (is_win) {
+  main_extern += [ "$rust_build:winapi" ]
+}
 
 ts_sources = [
   "js/assets.ts",
@@ -60,8 +61,10 @@ ts_sources = [
   "js/dispatch.ts",
   "js/dom_types.ts",
   "js/errors.ts",
+  "js/event.ts",
+  "js/event_target.ts",
   "js/fetch.ts",
-  "js/file.ts",
+  "js/dom_file.ts",
   "js/file_info.ts",
   "js/files.ts",
   "js/flatbuffers.ts",
@@ -88,7 +91,6 @@ ts_sources = [
   "js/rename.ts",
   "js/repl.ts",
   "js/resources.ts",
-  "js/runner.ts",
   "js/stat.ts",
   "js/symlink.ts",
   "js/text_encoding.ts",
@@ -98,6 +100,7 @@ ts_sources = [
   "js/url.ts",
   "js/url_search_params.ts",
   "js/util.ts",
+  "js/workers.ts",
   "js/write_file.ts",
   "tsconfig.json",
 
@@ -175,6 +178,7 @@ run_node("deno_runtime_declaration") {
     rebase_path("node_modules/ts-node/dist/bin.js", root_build_dir),
     "--project",
     rebase_path("tools/ts_library_builder/tsconfig.json"),
+    "--skip-ignore",
     rebase_path("tools/ts_library_builder/main.ts", root_build_dir),
     "--basePath",
     rebase_path(".", root_build_dir),

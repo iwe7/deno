@@ -1,7 +1,7 @@
-// Copyright 2018 the Deno authors. All rights reserved. MIT license.
-use errors;
-use errors::{DenoError, DenoResult};
-use tokio_util;
+// Copyright 2018-2019 the Deno authors. All rights reserved. MIT license.
+use crate::errors;
+use crate::errors::{DenoError, DenoResult};
+use crate::tokio_util;
 
 use futures::future::{loop_fn, Loop};
 use futures::{future, Future, Stream};
@@ -55,7 +55,7 @@ fn resolve_uri_from_location(base_uri: &Uri, location: &str) -> Uri {
 
 // The CodeFetch message is used to load HTTP javascript resources and expects a
 // synchronous response, this utility method supports that.
-pub fn fetch_sync_string(module_name: &str) -> DenoResult<(Vec<u8>, String)> {
+pub fn fetch_sync_string(module_name: &str) -> DenoResult<(String, String)> {
   let url = module_name.parse::<Uri>().unwrap();
   let client = get_client();
   // TODO(kevinkassimo): consider set a max redirection counter
@@ -93,11 +93,11 @@ pub fn fetch_sync_string(module_name: &str) -> DenoResult<(Vec<u8>, String)> {
     let body = response
       .into_body()
       .concat2()
-      .map(|body| body.to_vec())
+      .map(|body| String::from_utf8(body.to_vec()).unwrap())
       .map_err(DenoError::from);
     body.join(future::ok(content_type))
-  }).and_then(|(body_bytes, maybe_content_type)| {
-    future::ok((body_bytes, maybe_content_type.unwrap()))
+  }).and_then(|(body_string, maybe_content_type)| {
+    future::ok((body_string, maybe_content_type.unwrap()))
   });
 
   tokio_util::block_on(fetch_future)

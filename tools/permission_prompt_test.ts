@@ -1,4 +1,5 @@
-import { args, listen, env, exit, makeTempDirSync } from "deno";
+// Copyright 2018-2019 the Deno authors. All rights reserved. MIT license.
+import { args, listen, env, exit, makeTempDirSync, run } from "deno";
 
 const name = args[1];
 const test = {
@@ -10,6 +11,16 @@ const test = {
   },
   needsNet: () => {
     listen("tcp", "127.0.0.1:4540");
+  },
+  needsRun: async () => {
+    const process = run({
+      args: [
+        "python",
+        "-c",
+        "import sys; sys.stdout.write('hello'); sys.stdout.flush()"
+      ]
+    });
+    await process.status();
   }
 }[name];
 

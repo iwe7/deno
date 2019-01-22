@@ -1,8 +1,9 @@
-// Copyright 2018 the Deno authors. All rights reserved. MIT license.
+// Copyright 2018-2019 the Deno authors. All rights reserved. MIT license.
+use crate::libdeno;
+
 use getopts;
 use getopts::Options;
 use libc::c_int;
-use libdeno;
 use std::ffi::CStr;
 use std::ffi::CString;
 use std::mem;
@@ -15,7 +16,7 @@ macro_rules! svec {
 }
 
 #[cfg_attr(feature = "cargo-clippy", allow(stutter))]
-#[derive(Debug, PartialEq, Default)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct DenoFlags {
   pub help: bool,
   pub log_debug: bool,
@@ -27,6 +28,7 @@ pub struct DenoFlags {
   pub allow_env: bool,
   pub allow_run: bool,
   pub types: bool,
+  pub prefetch: bool,
 }
 
 pub fn get_usage(opts: &Options) -> String {
@@ -97,8 +99,17 @@ fn set_recognized_flags(
         if matches.opt_present("allow-run") {
           flags.allow_run = true;
         }
+        if matches.opt_present("allow-all") {
+          flags.allow_env = true;
+          flags.allow_net = true;
+          flags.allow_run = true;
+          flags.allow_write = true;
+        }
         if matches.opt_present("types") {
           flags.types = true;
+        }
+        if matches.opt_present("prefetch") {
+          flags.prefetch = true;
         }
 
         if !matches.free.is_empty() {
@@ -127,6 +138,7 @@ pub fn set_flags(
   opts.optflag("", "allow-net", "Allow network access.");
   opts.optflag("", "allow-env", "Allow environment access.");
   opts.optflag("", "allow-run", "Allow running subprocesses.");
+  opts.optflag("A", "allow-all", "Allow all permissions");
   opts.optflag("", "recompile", "Force recompilation of TypeScript code.");
   opts.optflag("h", "help", "Print this message.");
   opts.optflag("D", "log-debug", "Log debug output.");
@@ -134,6 +146,7 @@ pub fn set_flags(
   opts.optflag("r", "reload", "Reload cached remote resources.");
   opts.optflag("", "v8-options", "Print V8 command line options.");
   opts.optflag("", "types", "Print runtime TypeScript declarations.");
+  opts.optflag("", "prefetch", "Prefetch the dependencies.");
 
   let mut flags = DenoFlags::default();
 
@@ -228,13 +241,30 @@ fn test_set_flags_6() {
   )
 }
 
+#[test]
+fn test_set_flags_7() {
+  let (flags, rest, _) =
+    set_flags(svec!["deno", "gist.ts", "--allow-all"]).unwrap();
+  assert_eq!(rest, svec!["deno", "gist.ts"]);
+  assert_eq!(
+    flags,
+    DenoFlags {
+      allow_net: true,
+      allow_env: true,
+      allow_run: true,
+      allow_write: true,
+      ..DenoFlags::default()
+    }
+  )
+}
+
 // Returns args passed to V8, followed by args passed to JS
 fn v8_set_flags_preprocess(args: Vec<String>) -> (Vec<String>, Vec<String>) {
   let (rest, mut v8_args) =
     args.into_iter().partition(|ref a| a.as_str() == "--help");
 
   // Replace args being sent to V8
-  for mut a in &mut v8_args {
+  for a in &mut v8_args {
     if a == "--v8-options" {
       mem::swap(a, &mut String::from("--help"));
     }
@@ -287,17 +317,12 @@ pub fn v8_set_flags(args: Vec<String>) -> Vec<String> {
   // Store the length of the c_argv array in a local variable. We'll pass
   // a pointer to this local variable to deno_set_v8_flags(), which then
   // updates its value.
-  #[cfg_attr(
-    feature = "cargo-clippy",
-    allow(cast_possible_truncation, cast_possible_wrap)
-  )]
   let mut c_argv_len = c_argv.len() as c_int;
   // Let v8 parse the arguments it recognizes and remove them from c_argv.
   unsafe {
     libdeno::deno_set_v8_flags(&mut c_argv_len, c_argv.as_mut_ptr());
   };
   // If c_argv_len was updated we have to change the length of c_argv to match.
-  #[cfg_attr(feature = "cargo-clippy", allow(cast_sign_loss))]
   c_argv.truncate(c_argv_len as usize);
   // Copy the modified arguments list into a proper rust vec and return it.
   c_argv

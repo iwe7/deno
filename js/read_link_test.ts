@@ -1,9 +1,9 @@
-// Copyright 2018 the Deno authors. All rights reserved. MIT license.
+// Copyright 2018-2019 the Deno authors. All rights reserved. MIT license.
 import { test, testPerm, assert, assertEqual } from "./test_util.ts";
 import * as deno from "deno";
 
 testPerm({ write: true }, function readlinkSyncSuccess() {
-  const testDir = deno.makeTempDirSync() + "/test-readlink-sync";
+  const testDir = deno.makeTempDirSync();
   const target = testDir + "/target";
   const symlink = testDir + "/symln";
   deno.mkdirSync(target);
@@ -30,7 +30,7 @@ test(function readlinkSyncNotFound() {
 });
 
 testPerm({ write: true }, async function readlinkSuccess() {
-  const testDir = deno.makeTempDirSync() + "/test-readlink";
+  const testDir = deno.makeTempDirSync();
   const target = testDir + "/target";
   const symlink = testDir + "/symln";
   deno.mkdirSync(target);

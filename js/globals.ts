@@ -1,4 +1,4 @@
-// Copyright 2018 the Deno authors. All rights reserved. MIT license.
+// Copyright 2018-2019 the Deno authors. All rights reserved. MIT license.
 // This is a "special" module, in that it define the global runtime scope of
 // Deno, and therefore it defines a lot of the runtime environemnt that code
 // is evaluated in.  We use this file to automatically build the runtime type
@@ -10,6 +10,8 @@
 import * as blob from "./blob";
 import * as consoleTypes from "./console";
 import * as domTypes from "./dom_types";
+import * as event from "./event";
+import * as eventTarget from "./event_target";
 import * as formData from "./form_data";
 import * as fetchTypes from "./fetch";
 import * as headers from "./headers";
@@ -17,6 +19,7 @@ import * as textEncoding from "./text_encoding";
 import * as timers from "./timers";
 import * as url from "./url";
 import * as urlSearchParams from "./url_search_params";
+import * as workers from "./workers";
 
 // These imports are not exposed and therefore are fine to just import the
 // symbols required.
@@ -61,6 +64,12 @@ export type Blob = blob.DenoBlob;
 // window.File = file.DenoFile;
 // export type File = file.DenoFile;
 
+window.EventInit = event.EventInit;
+export type EventInit = event.EventInit;
+window.Event = event.Event;
+export type Event = event.Event;
+window.EventTarget = eventTarget.EventTarget;
+export type EventTarget = eventTarget.EventTarget;
 window.URL = url.URL;
 export type URL = url.URL;
 window.URLSearchParams = urlSearchParams.URLSearchParams;
@@ -78,3 +87,8 @@ window.TextEncoder = textEncoding.TextEncoder;
 export type TextEncoder = textEncoding.TextEncoder;
 window.TextDecoder = textEncoding.TextDecoder;
 export type TextDecoder = textEncoding.TextDecoder;
+
+window.workerMain = workers.workerMain;
+// TODO These shouldn't be available in main isolate.
+window.postMessage = workers.postMessage;
+window.close = workers.workerClose;

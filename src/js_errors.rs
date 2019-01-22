@@ -1,4 +1,4 @@
-// Copyright 2018 the Deno authors. All rights reserved. MIT license.
+// Copyright 2018-2019 the Deno authors. All rights reserved. MIT license.
 
 // Note that source_map_mappings requires 0-indexed line and column numbers but
 // V8 Exceptions are 1-indexed.
@@ -17,7 +17,7 @@ use std::collections::HashMap;
 
 pub trait SourceMapGetter {
   /// Returns the raw source map file.
-  fn get_source_map(&self, script_name: &str) -> Option<Vec<u8>>;
+  fn get_source_map(&self, script_name: &str) -> Option<String>;
 }
 
 struct SourceMap {
@@ -43,6 +43,16 @@ pub struct StackFrame {
 #[derive(Debug, PartialEq)]
 pub struct JSError {
   pub message: String,
+
+  pub source_line: Option<String>,
+  pub script_resource_name: Option<String>,
+  pub line_number: Option<i64>,
+  pub start_position: Option<i64>,
+  pub end_position: Option<i64>,
+  pub error_level: Option<i64>,
+  pub start_column: Option<i64>,
+  pub end_column: Option<i64>,
+
   pub frames: Vec<StackFrame>,
 }
 
@@ -50,7 +60,7 @@ impl ToString for StackFrame {
   fn to_string(&self) -> String {
     // Note when we print to string, we change from 0-indexed to 1-indexed.
     let (line, column) = (self.line + 1, self.column + 1);
-    if self.function_name.len() > 0 {
+    if !self.function_name.is_empty() {
       format!(
         "    at {} ({}:{}:{})",
         self.function_name, self.script_name, line, column
@@ -65,7 +75,32 @@ impl ToString for StackFrame {
 
 impl ToString for JSError {
   fn to_string(&self) -> String {
-    let mut s = self.message.clone();
+    // TODO Improve the formatting of these error messages.
+    let mut s = String::new();
+
+    if self.script_resource_name.is_some() {
+      let script_resource_name = self.script_resource_name.as_ref().unwrap();
+      // Avoid showing internal code from gen/bundle/main.js
+      if script_resource_name != "gen/bundle/main.js" {
+        s.push_str(script_resource_name);
+        if self.line_number.is_some() {
+          s.push_str(&format!(
+            ":{}:{}",
+            self.line_number.unwrap(),
+            self.start_column.unwrap()
+          ));
+          assert!(self.start_column.is_some());
+        }
+        if self.source_line.is_some() {
+          s.push_str("\n");
+          s.push_str(self.source_line.as_ref().unwrap());
+          s.push_str("\n\n");
+        }
+      }
+    }
+
+    s.push_str(&self.message);
+
     for frame in &self.frames {
       s.push_str("\n");
       s.push_str(&frame.to_string());
@@ -149,7 +184,7 @@ impl StackFrame {
   fn apply_source_map(
     &self,
     mappings_map: &mut CachedMaps,
-    getter: &SourceMapGetter,
+    getter: &dyn SourceMapGetter,
   ) -> StackFrame {
     let maybe_sm =
       get_mappings(self.script_name.as_ref(), mappings_map, getter);
@@ -193,10 +228,10 @@ impl SourceMap {
     // Ugly. Maybe use serde_derive.
     match serde_json::from_str::<serde_json::Value>(json_str) {
       Ok(serde_json::Value::Object(map)) => match map["mappings"].as_str() {
-        None => return None,
+        None => None,
         Some(mappings_str) => {
           match parse_mappings::<()>(mappings_str.as_bytes()) {
-            Err(_) => return None,
+            Err(_) => None,
             Ok(mappings) => {
               if !map["sources"].is_array() {
                 return None;
@@ -213,12 +248,12 @@ impl SourceMap {
                 }
               }
 
-              return Some(SourceMap { sources, mappings });
+              Some(SourceMap { sources, mappings })
             }
           }
         }
       },
-      _ => return None,
+      _ => None,
     }
   }
 }
@@ -243,6 +278,19 @@ impl JSError {
     }
     let message = String::from(message_v.as_str().unwrap());
 
+    let source_line = obj
+      .get("sourceLine")
+      .and_then(|v| v.as_str().map(String::from));
+    let script_resource_name = obj
+      .get("scriptResourceName")
+      .and_then(|v| v.as_str().map(String::from));
+    let line_number = obj.get("lineNumber").and_then(|v| v.as_i64());
+    let start_position = obj.get("startPosition").and_then(|v| v.as_i64());
+    let end_position = obj.get("endPosition").and_then(|v| v.as_i64());
+    let error_level = obj.get("errorLevel").and_then(|v| v.as_i64());
+    let start_column = obj.get("startColumn").and_then(|v| v.as_i64());
+    let end_column = obj.get("endColumn").and_then(|v| v.as_i64());
+
     let frames_v = &obj["frames"];
     if !frames_v.is_array() {
       return None;
@@ -257,24 +305,46 @@ impl JSError {
       }
     }
 
-    Some(JSError { message, frames })
+    Some(JSError {
+      message,
+      source_line,
+      script_resource_name,
+      line_number,
+      start_position,
+      end_position,
+      error_level,
+      start_column,
+      end_column,
+      frames,
+    })
   }
 
-  pub fn apply_source_map(&self, getter: &SourceMapGetter) -> Self {
-    let message = self.message.clone();
+  pub fn apply_source_map(&self, getter: &dyn SourceMapGetter) -> Self {
     let mut mappings_map: CachedMaps = HashMap::new();
     let mut frames = Vec::<StackFrame>::new();
     for frame in &self.frames {
       let f = frame.apply_source_map(&mut mappings_map, getter);
       frames.push(f);
     }
-    JSError { message, frames }
+    JSError {
+      message: self.message.clone(),
+      frames,
+      error_level: self.error_level,
+      source_line: self.source_line.clone(),
+      // TODO the following need to be source mapped:
+      script_resource_name: self.script_resource_name.clone(),
+      line_number: self.line_number,
+      start_position: self.start_position,
+      end_position: self.end_position,
+      start_column: self.start_column,
+      end_column: self.end_column,
+    }
   }
 }
 
 fn parse_map_string(
   script_name: &str,
-  getter: &SourceMapGetter,
+  getter: &dyn SourceMapGetter,
 ) -> Option<SourceMap> {
   match script_name {
     // The bundle does not get built for 'cargo check', so we don't embed the
@@ -287,9 +357,7 @@ fn parse_map_string(
     }
     _ => match getter.get_source_map(script_name) {
       None => None,
-      Some(raw_source_map) => SourceMap::from_json(
-        &String::from_utf8(raw_source_map).expect("SourceMap is not utf-8"),
-      ),
+      Some(raw_source_map) => SourceMap::from_json(&raw_source_map),
     },
   }
 }
@@ -297,7 +365,7 @@ fn parse_map_string(
 fn get_mappings<'a>(
   script_name: &str,
   mappings_map: &'a mut CachedMaps,
-  getter: &SourceMapGetter,
+  getter: &dyn SourceMapGetter,
 ) -> &'a Option<SourceMap> {
   mappings_map
     .entry(script_name.to_string())
@@ -311,6 +379,14 @@ mod tests {
   fn error1() -> JSError {
     JSError {
       message: "Error: foo bar".to_string(),
+      source_line: None,
+      script_resource_name: None,
+      line_number: None,
+      start_position: None,
+      end_position: None,
+      error_level: None,
+      start_column: None,
+      end_column: None,
       frames: vec![
         StackFrame {
           line: 4,
@@ -346,13 +422,13 @@ mod tests {
   struct MockSourceMapGetter {}
 
   impl SourceMapGetter for MockSourceMapGetter {
-    fn get_source_map(&self, script_name: &str) -> Option<Vec<u8>> {
-      let s: &[u8] = match script_name {
-        "foo_bar.ts" => br#"{"sources": ["foo_bar.ts"], "mappings":";;;IAIA,OAAO,CAAC,GAAG,CAAC,qBAAqB,EAAE,EAAE,CAAC,OAAO,CAAC,CAAC;IAC/C,OAAO,CAAC,GAAG,CAAC,eAAe,EAAE,IAAI,CAAC,QAAQ,CAAC,IAAI,CAAC,CAAC;IACjD,OAAO,CAAC,GAAG,CAAC,WAAW,EAAE,IAAI,CAAC,QAAQ,CAAC,EAAE,CAAC,CAAC;IAE3C,OAAO,CAAC,GAAG,CAAC,GAAG,CAAC,CAAC"}"#,
-        "bar_baz.ts" => br#"{"sources": ["bar_baz.ts"], "mappings":";;;IAEA,CAAC,KAAK,IAAI,EAAE;QACV,MAAM,GAAG,GAAG,sDAAa,OAAO,2BAAC,CAAC;QAClC,OAAO,CAAC,GAAG,CAAC,GAAG,CAAC,CAAC;IACnB,CAAC,CAAC,EAAE,CAAC;IAEQ,QAAA,GAAG,GAAG,KAAK,CAAC;IAEzB,OAAO,CAAC,GAAG,CAAC,GAAG,CAAC,CAAC"}"#,
+    fn get_source_map(&self, script_name: &str) -> Option<String> {
+      let s = match script_name {
+        "foo_bar.ts" => r#"{"sources": ["foo_bar.ts"], "mappings":";;;IAIA,OAAO,CAAC,GAAG,CAAC,qBAAqB,EAAE,EAAE,CAAC,OAAO,CAAC,CAAC;IAC/C,OAAO,CAAC,GAAG,CAAC,eAAe,EAAE,IAAI,CAAC,QAAQ,CAAC,IAAI,CAAC,CAAC;IACjD,OAAO,CAAC,GAAG,CAAC,WAAW,EAAE,IAAI,CAAC,QAAQ,CAAC,EAAE,CAAC,CAAC;IAE3C,OAAO,CAAC,GAAG,CAAC,GAAG,CAAC,CAAC"}"#,
+        "bar_baz.ts" => r#"{"sources": ["bar_baz.ts"], "mappings":";;;IAEA,CAAC,KAAK,IAAI,EAAE;QACV,MAAM,GAAG,GAAG,sDAAa,OAAO,2BAAC,CAAC;QAClC,OAAO,CAAC,GAAG,CAAC,GAAG,CAAC,CAAC;IACnB,CAAC,CAAC,EAAE,CAAC;IAEQ,QAAA,GAAG,GAAG,KAAK,CAAC;IAEzB,OAAO,CAAC,GAAG,CAAC,GAAG,CAAC,CAAC"}"#,
         _ => return None,
       };
-      Some(s.to_vec())
+      Some(s.to_string())
     }
   }
 
@@ -445,6 +521,25 @@ mod tests {
   }
 
   #[test]
+  fn js_error_from_v8_exception2() {
+    let r = JSError::from_v8_exception(
+      "{\"message\":\"Error: boo\",\"sourceLine\":\"throw Error('boo');\",\"scriptResourceName\":\"a.js\",\"lineNumber\":3,\"startPosition\":8,\"endPosition\":9,\"errorLevel\":8,\"startColumn\":6,\"endColumn\":7,\"isSharedCrossOrigin\":false,\"isOpaque\":false,\"frames\":[{\"line\":3,\"column\":7,\"functionName\":\"\",\"scriptName\":\"a.js\",\"isEval\":false,\"isConstructor\":false,\"isWasm\":false}]}"
+    );
+    assert!(r.is_some());
+    let e = r.unwrap();
+    assert_eq!(e.message, "Error: boo");
+    assert_eq!(e.source_line, Some("throw Error('boo');".to_string()));
+    assert_eq!(e.script_resource_name, Some("a.js".to_string()));
+    assert_eq!(e.line_number, Some(3));
+    assert_eq!(e.start_position, Some(8));
+    assert_eq!(e.end_position, Some(9));
+    assert_eq!(e.error_level, Some(8));
+    assert_eq!(e.start_column, Some(6));
+    assert_eq!(e.end_column, Some(7));
+    assert_eq!(e.frames.len(), 1);
+  }
+
+  #[test]
   fn stack_frame_to_string() {
     let e = error1();
     assert_eq!("    at foo (foo_bar.ts:5:17)", e.frames[0].to_string());
@@ -464,6 +559,14 @@ mod tests {
     let actual = e.apply_source_map(&getter);
     let expected = JSError {
       message: "Error: foo bar".to_string(),
+      source_line: None,
+      script_resource_name: None,
+      line_number: None,
+      start_position: None,
+      end_position: None,
+      error_level: None,
+      start_column: None,
+      end_column: None,
       frames: vec![
         StackFrame {
           line: 5,
@@ -499,9 +602,16 @@ mod tests {
 
   #[test]
   fn js_error_apply_source_map_2() {
-    // Because this is accessing the live bundle, this test might be more fragile
     let e = JSError {
       message: "TypeError: baz".to_string(),
+      source_line: None,
+      script_resource_name: None,
+      line_number: None,
+      start_position: None,
+      end_position: None,
+      error_level: None,
+      start_column: None,
+      end_column: None,
       frames: vec![StackFrame {
         line: 11,
         column: 12,
@@ -515,10 +625,9 @@ mod tests {
     let getter = MockSourceMapGetter {};
     let actual = e.apply_source_map(&getter);
     assert_eq!(actual.message, "TypeError: baz");
+    // Because this is accessing the live bundle, this test might be more fragile
     assert_eq!(actual.frames.len(), 1);
-    assert_eq!(actual.frames[0].line, 15);
-    assert_eq!(actual.frames[0].column, 16);
-    assert_eq!(actual.frames[0].script_name, "deno/js/util.ts");
+    assert!(actual.frames[0].script_name.ends_with("js/util.ts"));
   }
 
   #[test]

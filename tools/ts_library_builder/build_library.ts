@@ -58,7 +58,7 @@ const { ModuleKind, ModuleResolutionKind, ScriptTarget } = ts;
  * A preamble which is appended to the start of the library.
  */
 // tslint:disable-next-line:max-line-length
-const libPreamble = `// Copyright 2018 the Deno authors. All rights reserved. MIT license.
+const libPreamble = `// Copyright 2018-2019 the Deno authors. All rights reserved. MIT license.
 
 /// <reference no-default-lib="true" />
 /// <reference lib="esnext" />
@@ -155,6 +155,10 @@ export function mergeGlobal({
 
   // Declare the global variable
   addVariableDeclaration(targetSourceFile, globalVarName, interfaceName, true);
+
+  // `globalThis` accesses the global scope and is defined here:
+  // https://github.com/tc39/proposal-global
+  addVariableDeclaration(targetSourceFile, "globalThis", interfaceName, true);
 
   // Add self reference to the global variable
   addInterfaceProperty(interfaceDeclaration, globalVarName, interfaceName);

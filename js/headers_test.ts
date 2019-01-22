@@ -1,5 +1,5 @@
-// Copyright 2018 the Deno authors. All rights reserved. MIT license.
-import { test, testPerm, assert, assertEqual } from "./test_util.ts";
+// Copyright 2018-2019 the Deno authors. All rights reserved. MIT license.
+import { test, assert, assertEqual } from "./test_util.ts";
 import * as deno from "deno";
 
 // Logic heavily copied from web-platform-tests, make
@@ -224,7 +224,100 @@ test(function headerIllegalReject() {
   } catch (e) {
     errorCount++;
   }
-  assertEqual(errorCount, 8);
+  try {
+    headers.set("", "ok");
+  } catch (e) {
+    errorCount++;
+  }
+  assertEqual(errorCount, 9);
   // 'o k' is valid value but invalid name
   new Headers({ "He-y": "o k" });
+});
+
+// If pair does not contain exactly two items,then throw a TypeError.
+test(function headerParamsShouldThrowTypeError() {
+  let hasThrown = 0;
+
+  try {
+    new Headers(([["1"]] as unknown) as Array<[string, string]>);
+    hasThrown = 1;
+  } catch (err) {
+    if (err instanceof TypeError) {
+      hasThrown = 2;
+    } else {
+      hasThrown = 3;
+    }
+  }
+
+  assertEqual(hasThrown, 2);
+});
+
+test(function headerParamsArgumentsCheck() {
+  const methodRequireOneParam = ["delete", "get", "has", "forEach"];
+
+  const methodRequireTwoParams = ["append", "set"];
+
+  methodRequireOneParam.forEach(method => {
+    const headers = new Headers();
+    let hasThrown = 0;
+    let errMsg = "";
+    try {
+      headers[method]();
+      hasThrown = 1;
+    } catch (err) {
+      errMsg = err.message;
+      if (err instanceof TypeError) {
+        hasThrown = 2;
+      } else {
+        hasThrown = 3;
+      }
+    }
+    assertEqual(hasThrown, 2);
+    assertEqual(
+      errMsg,
+      `Headers.${method} requires at least 1 argument, but only 0 present`
+    );
+  });
+
+  methodRequireTwoParams.forEach(method => {
+    const headers = new Headers();
+    let hasThrown = 0;
+    let errMsg = "";
+
+    try {
+      headers[method]();
+      hasThrown = 1;
+    } catch (err) {
+      errMsg = err.message;
+      if (err instanceof TypeError) {
+        hasThrown = 2;
+      } else {
+        hasThrown = 3;
+      }
+    }
+    assertEqual(hasThrown, 2);
+    assertEqual(
+      errMsg,
+      `Headers.${method} requires at least 2 arguments, but only 0 present`
+    );
+
+    hasThrown = 0;
+    errMsg = "";
+    try {
+      headers[method]("foo");
+      hasThrown = 1;
+    } catch (err) {
+      errMsg = err.message;
+      if (err instanceof TypeError) {
+        hasThrown = 2;
+      } else {
+        hasThrown = 3;
+      }
+    }
+    assertEqual(hasThrown, 2);
+    assertEqual(
+      errMsg,
+      `Headers.${method} requires at least 2 arguments, but only 1 present`
+    );
+  });
 });

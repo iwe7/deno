@@ -32,6 +32,12 @@ _Note: Depending on your security settings, you may have to run
 `Set-ExecutionPolicy RemoteSigned -Scope CurrentUser` first to allow downloaded
 scripts to be executed._
 
+With [Scoop](https://scoop.sh/):
+
+```
+scoop install deno
+```
+
 Deno can also be installed manually, by downloading a tarball or zip file at
 [github.com/denoland/deno/releases](https://github.com/denoland/deno/releases).
 These packages contain just a single executable file. You will have to set the
@@ -145,7 +151,7 @@ browser JavaScript, Deno can import libraries directly from URLs. This example
 uses a URL to import a test runner library:
 
 ```ts
-import { test, assertEqual } from "https://deno.land/x/testing/testing.ts";
+import { test, assertEqual } from "https://deno.land/x/testing/mod.ts";
 
 test(function t1() {
   assertEqual("hello", "hello");
@@ -161,10 +167,8 @@ Try running this:
 ```
 > deno https://deno.land/x/examples/example_test.ts
 Compiling /Users/rld/src/deno_examples/example_test.ts
-Downloading https://deno.land/x/testing/testing.ts
-Downloading https://deno.land/x/testing/util.ts
-Compiling https://deno.land/x/testing/testing.ts
-Compiling https://deno.land/x/testing/util.ts
+Downloading https://deno.land/x/testing/mod.ts
+Compiling https://deno.land/x/testing/mod.ts
 running 2 tests
 test t1
 ... ok
@@ -202,11 +206,11 @@ everywhere in a large project?** The solution is to import and re-export your
 external libraries in a central `package.ts` file (which serves the same purpose
 as Node's `package.json` file). For example, let's say you were using the above
 testing library across a large project. Rather than importing
-`"https://deno.land/x/testing/testing.ts"` everywhere, you could create a
+`"https://deno.land/x/testing/mod.ts"` everywhere, you could create a
 `package.ts` file the exports the third-party code:
 
 ```ts
-export { test, assertEqual } from "https://deno.land/x/testing/testing.ts";
+export { test, assertEqual } from "https://deno.land/x/testing/mod.ts";
 ```
 
 And throughout project one can import from the `package.ts` and avoid having
@@ -309,7 +313,7 @@ Current executable set to '../deno/target/debug/deno' (x86_64).
 To ensure reproducible builds, deno has most of its dependencies in a git
 submodule. However, you need to install separately:
 
-1. [Rust](https://www.rust-lang.org/en-US/install.html) >= 1.30.0
+1. [Rust](https://www.rust-lang.org/en-US/install.html) >= 1.31.1
 2. [Node](https://nodejs.org/)
 3. Python 2.
    [Not 3](https://github.com/denoland/deno/issues/464#issuecomment-411795578).
@@ -340,7 +344,7 @@ submodule. However, you need to install separately:
     ./tools/test.py
 
     # Format code.
-    ./tools/format.py
+    deno ./tools/format.ts
 
 Other useful commands:
 

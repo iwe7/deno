@@ -1,4 +1,4 @@
-// Copyright 2018 the Deno authors. All rights reserved. MIT license.
+// Copyright 2018-2019 the Deno authors. All rights reserved. MIT license.
 #ifndef INTERNAL_H_
 #define INTERNAL_H_
 
@@ -20,6 +20,7 @@ class DenoIsolate {
         snapshot_creator_(nullptr),
         global_import_buf_ptr_(nullptr),
         recv_cb_(config.recv_cb),
+        resolve_cb_(config.resolve_cb),
         next_req_id_(0),
         user_data_(nullptr) {
     array_buffer_allocator_ = v8::ArrayBuffer::Allocator::NewDefaultAllocator();
@@ -40,6 +41,11 @@ class DenoIsolate {
   }
 
   void AddIsolate(v8::Isolate* isolate);
+  void RegisterModule(const char* filename, v8::Local<v8::Module> module);
+  void ResolveOk(const char* filename, const char* source);
+  void ClearModules();
+
+  v8::Local<v8::Object> GetBuiltinModules();
 
   v8::Isolate* isolate_;
   v8::ArrayBuffer::Allocator* array_buffer_allocator_;
@@ -48,8 +54,19 @@ class DenoIsolate {
   v8::SnapshotCreator* snapshot_creator_;
   void* global_import_buf_ptr_;
   deno_recv_cb recv_cb_;
+  deno_resolve_cb resolve_cb_;
   int32_t next_req_id_;
   void* user_data_;
+
+  // identity hash -> filename, module (avoid hash collision)
+  std::multimap<int, std::pair<std::string, v8::Persistent<v8::Module>>>
+      module_info_map_;
+  // filename -> Module
+  std::map<std::string, v8::Persistent<v8::Module>> module_map_;
+  // Set by deno_resolve_ok
+  v8::Persistent<v8::Module> resolve_module_;
+
+  v8::Persistent<v8::Object> builtin_modules_;
 
   v8::Persistent<v8::Context> context_;
   std::map<int32_t, v8::Persistent<v8::Value>> async_data_map_;
@@ -83,14 +100,28 @@ struct InternalFieldData {
   uint32_t data;
 };
 
+static inline v8::Local<v8::String> v8_str(const char* x,
+                                           bool internalize = false) {
+  return v8::String::NewFromUtf8(v8::Isolate::GetCurrent(), x,
+                                 internalize ? v8::NewStringType::kInternalized
+                                             : v8::NewStringType::kNormal)
+      .ToLocalChecked();
+}
+
 void Print(const v8::FunctionCallbackInfo<v8::Value>& args);
 void Recv(const v8::FunctionCallbackInfo<v8::Value>& args);
 void Send(const v8::FunctionCallbackInfo<v8::Value>& args);
 void Shared(v8::Local<v8::Name> property,
             const v8::PropertyCallbackInfo<v8::Value>& info);
+void BuiltinModules(v8::Local<v8::Name> property,
+                    const v8::PropertyCallbackInfo<v8::Value>& info);
 static intptr_t external_references[] = {
-    reinterpret_cast<intptr_t>(Print), reinterpret_cast<intptr_t>(Recv),
-    reinterpret_cast<intptr_t>(Send), reinterpret_cast<intptr_t>(Shared), 0};
+    reinterpret_cast<intptr_t>(Print),
+    reinterpret_cast<intptr_t>(Recv),
+    reinterpret_cast<intptr_t>(Send),
+    reinterpret_cast<intptr_t>(Shared),
+    reinterpret_cast<intptr_t>(BuiltinModules),
+    0};
 
 static const deno_buf empty_buf = {nullptr, 0, nullptr, 0};
 
@@ -113,6 +144,8 @@ void DeleteDataRef(DenoIsolate* d, int32_t req_id);
 
 bool Execute(v8::Local<v8::Context> context, const char* js_filename,
              const char* js_source);
+bool ExecuteMod(v8::Local<v8::Context> context, const char* js_filename,
+                const char* js_source, bool resolve_only);
 
 }  // namespace deno
 
